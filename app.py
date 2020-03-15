@@ -12,6 +12,7 @@ import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
+from flask_migrate import Migrate
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -20,6 +21,8 @@ app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
 db = SQLAlchemy(app)
+
+migrate = Migrate(app, db)
 
 # TODO: connect to a local postgresql database
 
@@ -31,13 +34,20 @@ class Venue(db.Model):
     __tablename__ = 'Venue'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    address = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
+    name = db.Column(db.String, nullable=True)
+    city = db.Column(db.String(120), nullable=True)
+    state = db.Column(db.String(120), nullable=True)
+    address = db.Column(db.String(120), nullable=True)
+    seeking_talent = db.Column(db.Boolean, nullable=True)
+    
+    phone = db.Column(db.String(120), nullable=True)
+    image_link = db.Column(db.String(500), nullable=True)
+    facebook_link = db.Column(db.String(120), nullable=True)
+    website = db.Column(db.String(500), nullable=True)
+    seeking_description = db.Column(db.String, nullable=True)
+    
+    genres = db.relationship('Venue_Genre', backref='venue', lazy=True)
+    shows = db.relationship('Show', backref='venue', lazy=True)
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -45,15 +55,49 @@ class Artist(db.Model):
     __tablename__ = 'Artist'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
+    name = db.Column(db.String, nullable=True)
+    city = db.Column(db.String(120), nullable=True)
+    state = db.Column(db.String(120), nullable=True)
+    seeking_venue = db.Column(db.Boolean, nullable=True)
+    
+    phone = db.Column(db.String(120), nullable=True)
+    image_link = db.Column(db.String(500), nullable=True)
+    facebook_link = db.Column(db.String(120), nullable=True)
+    website = db.Column(db.String(500), nullable=True)
+    seeking_description = db.Column(db.String, nullable=True)
+    
+    genres = db.relationship('Artist_Genre', backref='artist', lazy=True)
+    shows = db.relationship('Show', backref='artist', lazy=True)
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
+
+class Artist_Genre(db.Model):
+    __tablename__ = 'Artist_Genre'
+    id = db.Column(db.Integer, primary_key=True)
+    genre = db.Column(db.String, nullable=True)
+    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=True)
+    
+class Venue_Genre(db.Model):
+    __tablename__ = 'Venue_Genre'
+    id = db.Column(db.Integer, primary_key=True)
+    genre = db.Column(db.String, nullable=True)
+    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=True)
+    
+class Show(db.Model):
+    __tablename__ = 'Show'
+    id = db.Column(db.Integer, primary_key=True)
+    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=True)
+    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=True)
+    
+#artist_genres = db.Table('artist_genres',
+#    db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
+#    db.Column('genre_id', db.Integer, db.ForeignKey('Genre.id'), primary_key=True)
+#)
+#
+#venue_genres = db.Table('venue_genres',
+#    db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True),
+#    db.Column('genre_id', db.Integer, db.ForeignKey('Genre.id'), primary_key=True)
+#)
 
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
 
@@ -87,28 +131,31 @@ def index():
 def venues():
   # TODO: replace with real venues data.
   #       num_shows should be aggregated based on number of upcoming shows per venue.
-  data=[{
-    "city": "San Francisco",
-    "state": "CA",
-    "venues": [{
-      "id": 1,
-      "name": "The Musical Hop",
-      "num_upcoming_shows": 0,
-    }, {
-      "id": 3,
-      "name": "Park Square Live Music & Coffee",
-      "num_upcoming_shows": 1,
+    data=[{
+        "city": "San Francisco",
+        "state": "CA",
+        "venues": [{
+          "id": 1,
+          "name": "The Musical Hop",
+          "num_upcoming_shows": 0,
+        }, {
+          "id": 3,
+          "name": "Park Square Live Music & Coffee",
+          "num_upcoming_shows": 1,
+        }]
+      }, {
+        "city": "New York",
+        "state": "NY",
+        "venues": [{
+          "id": 2,
+          "name": "The Dueling Pianos Bar",
+          "num_upcoming_shows": 0,
+        }]
     }]
-  }, {
-    "city": "New York",
-    "state": "NY",
-    "venues": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }]
-  return render_template('pages/venues.html', areas=data);
+    return render_template('pages/venues.html', areas=data)
+    
+
+  
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -219,15 +266,46 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
+    try:
+        name = request.form['name']
+        city = request.form['city']
+        state = request.form['state']
+        address = request.form['address']
+        seeking_talent = False
+        phone = request.form['phone']
+#        image_link = request.form['image_link']
+        facebook_link = request.form['facebook_link']
+#        website = request.form['website']
+#        seeking_description = request.form['seeking_description']
+        genres = request.form.to_dict(flat=False)['genres']
+        
+        venue = Venue(name=name, city=city, state=state, address=address, seeking_talent=seeking_talent, phone=phone, facebook_link=facebook_link)
+#        venue = Venue(image_link=image_link)
+#        venue = Venue(website=website)
+#        venue = Venue(seeking_description=seeking_description)
+#        venue = Venue(genres=genres)
+        db.session.add(venue)
+        db.session.flush()
+#        for g in genres:
+        genre = Venue_Genre(genre=genres, venue_id=venue.id)
+        db.session.add(genre)
+        db.session.commit()
+        flash(request.form['name'] + request.form['city'] + request.form['state'] + request.form['address'] + request.form['phone'] + request.form['facebook_link'])
+    except:
+        db.session.rollback()
+        flash('Failed!')
+    finally:
+        db.session.close()
+        flash('Venue ' + request.form['name'] + ' was successfully listed!')
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
 
   # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
+    
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+    return render_template('pages/home.html')
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
@@ -511,11 +589,10 @@ if not app.debug:
 #----------------------------------------------------------------------------#
 
 # Default port:
-#if __name__ == '__main__':
-#    app.run()
+if __name__ == '__main__':
+    app.run()
 
 # Or specify port manually:
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 81))
-    app.run(host='127.0.0.1', port=port)
+#if __name__ == '__main__':
+#    app.run(host='127.0.0.1', port=81)
     
