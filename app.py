@@ -187,24 +187,31 @@ def show_venue(venue_id):
     venues = Venue.query.order_by('id').all()
     shows = Show.query.order_by('id').all()
     jsonarray = []
+    date_time_now = datetime.now()
     
     for venue in venues:
         past_show_array = []
         upcoming_show_array = []
+        past_show_count = 0;
+        upcoming_show_count = 0;
         for show in Show.query.filter_by(venue_id=venue.id).all():
-            past_show_array.append({ 
-                'artist_id': show.artist_id,
-                'artist_name': Artist.query.filter_by(id=show.artist_id).first().name,
-                'artist_image_link': Artist.query.filter_by(id=show.artist_id).first().image_link,
-                'start_time': str(show.start_time)
-            })
+            if show.start_time < date_time_now:
+                past_show_count = past_show_count + 1
+                past_show_array.append({ 
+                    'artist_id': show.artist_id,
+                    'artist_name': Artist.query.filter_by(id=show.artist_id).first().name,
+                    'artist_image_link': Artist.query.filter_by(id=show.artist_id).first().image_link,
+                    'start_time': str(show.start_time)
+                })
         for show in Show.query.filter_by(venue_id=venue.id).all():
-            upcoming_show_array.append({ 
-                'artist_id': show.artist_id,
-                'artist_name': Artist.query.filter_by(id=show.artist_id).first().name,
-                'artist_image_link': Artist.query.filter_by(id=show.artist_id).first().image_link,
-                'start_time': str(show.start_time)
-            })
+            if show.start_time > date_time_now:
+                upcoming_show_count = upcoming_show_count + 1
+                upcoming_show_array.append({ 
+                    'artist_id': show.artist_id,
+                    'artist_name': Artist.query.filter_by(id=show.artist_id).first().name,
+                    'artist_image_link': Artist.query.filter_by(id=show.artist_id).first().image_link,
+                    'start_time': str(show.start_time)
+                })
         try:
             genres_result = str(Venue_Genre.query.filter_by(venue_id=venue.id).first().genre).replace("{", "").replace("}", "").split(',')
         except:
@@ -224,8 +231,8 @@ def show_venue(venue_id):
             'image_link': venue.seeking_description,
             'past_shows': past_show_array,
             'upcoming_shows': upcoming_show_array,
-            'past_shows_count': Show.query.filter_by(venue_id=venue.id).count(),
-            'upcoming_shows_count': Show.query.filter_by(venue_id=venue.id).count()
+            'past_shows_count': past_show_count,
+            'upcoming_shows_count': upcoming_show_count
         
         })
 
@@ -359,26 +366,34 @@ def show_artist(artist_id):
   # TODO: replace with real venue data from the venues table, using venue_id
     
     artists = Artist.query.order_by('id').all()
-    shows = Show.query.order_by('id').all()
+    shows  = Show.query.order_by('id').all()
     jsonarray = []
+#    x = datetime.fromisoformat('2020-05-15 17:12:43')
+    date_time_now = datetime.now()
     
     for artist in artists:
         past_show_array = []
         upcoming_show_array = []
+        past_show_count = 0;
+        upcoming_show_count = 0;
         for show in Show.query.filter_by(artist_id=artist.id).all():
-            past_show_array.append({ 
-                'venue_id': show.venue_id,
-                'venue_name': Venue.query.filter_by(id=show.venue_id).first().name,
-                'venue_image_link': Venue.query.filter_by(id=show.venue_id).first().image_link,
-                'start_time': str(show.start_time)
-            })
+            if show.start_time < date_time_now:
+                past_show_count = past_show_count + 1
+                past_show_array.append({ 
+                    'venue_id': show.venue_id,
+                    'venue_name': Venue.query.filter_by(id=show.venue_id).first().name,
+                    'venue_image_link': Venue.query.filter_by(id=show.venue_id).first().image_link,
+                    'start_time': str(show.start_time)
+                })
         for show in Show.query.filter_by(artist_id=artist.id).all():
-            upcoming_show_array.append({ 
-                'venue_id': show.venue_id,
-                'venue_name': Venue.query.filter_by(id=show.venue_id).first().name,
-                'venue_image_link': Venue.query.filter_by(id=show.venue_id).first().image_link,
-                'start_time': str(show.start_time)
-            })
+            if show.start_time > date_time_now:
+                upcoming_show_count = upcoming_show_count + 1
+                upcoming_show_array.append({ 
+                    'venue_id': show.venue_id,
+                    'venue_name': Venue.query.filter_by(id=show.venue_id).first().name,
+                    'venue_image_link': Venue.query.filter_by(id=show.venue_id).first().image_link,
+                    'start_time': str(show.start_time)
+                })
         try:
             genres_result = str(Artist_Genre.query.filter_by(artist_id=artist.id).first().genre).replace("{", "").replace("}", "").split(',')
         except:
@@ -397,8 +412,8 @@ def show_artist(artist_id):
             'image_link': artist.seeking_description,
             'past_shows': past_show_array,
             'upcoming_shows': upcoming_show_array,
-            'past_shows_count': Show.query.filter_by(artist_id=artist.id).count(),
-            'upcoming_shows_count': Show.query.filter_by(artist_id=artist.id).count()
+            'past_shows_count': past_show_count,
+            'upcoming_shows_count': upcoming_show_count
         
         })
 
